@@ -1,3 +1,12 @@
+components:
+  kserveCRDs:
+    enabled: false
+  knativeOperator:
+    enabled: false
+  kserveController:
+    enabled: false
+  litellm:
+    enabled: false
 serving:
   enabled: false
 gateway:
@@ -5,3 +14,18 @@ gateway:
 models:
   enabled: false
   items: []
+kserveController:
+  kserve:
+    controller:
+      deploymentMode: Knative
+      gateway:
+        disableIstioVirtualHost: true
+        disableIngressCreation: true
+litellm:
+  db:
+    deployStandalone: false
+    useExisting: false
+  redis:
+    enabled: false
+  migrationJob:
+    enabled: false

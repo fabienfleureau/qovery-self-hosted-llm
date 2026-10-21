@@ -1,5 +1,27 @@
 apiVersion: v2
 name: qovery-kserve-config
-description: Qovery configuration for official Knative Operator, KServe and Envoy Gateway
+description: KServe and Knative configuration with optional official upstream Helm
+  dependencies
 type: application
-version: 0.1.0
+version: 0.2.0
+dependencies:
+- name: kserve-crd
+  alias: kserveCRDs
+  version: v0.16.0
+  repository: oci://ghcr.io/kserve/charts
+  condition: components.kserveCRDs.enabled
+- name: knative-operator
+  alias: knativeOperator
+  version: v1.23.0
+  repository: https://knative.github.io/operator
+  condition: components.knativeOperator.enabled
+- name: kserve
+  alias: kserveController
+  version: v0.16.0
+  repository: oci://ghcr.io/kserve/charts
+  condition: components.kserveController.enabled
+- name: litellm-helm
+  alias: litellm
+  version: 0.1.837
+  repository: oci://ghcr.io/berriai
+  condition: components.litellm.enabled
