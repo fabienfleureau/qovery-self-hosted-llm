@@ -1,0 +1,18 @@
+{{- if .Values.models.enabled }}
+{{- range .Values.models.items }}
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ required "model.name is required" .name }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    {{- toYaml .annotations | nindent 4 }}
+  {{- with .labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- toYaml .spec | nindent 2 }}
+{{- end }}
+{{- end }}

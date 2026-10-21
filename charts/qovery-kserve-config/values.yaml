@@ -1,0 +1,7 @@
+serving:
+  enabled: false
+gateway:
+  enabled: false
+models:
+  enabled: false
+  items: []

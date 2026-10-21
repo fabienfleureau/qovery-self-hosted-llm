@@ -1,0 +1,11 @@
+{{- if .Values.serving.enabled }}
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: {{ required "serving.name is required" .Values.serving.name }}
+  namespace: {{ required "serving.namespace is required" .Values.serving.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  {{- toYaml .Values.serving.spec | nindent 2 }}
+{{- end }}

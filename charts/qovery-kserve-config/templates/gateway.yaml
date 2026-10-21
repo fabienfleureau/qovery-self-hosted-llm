@@ -1,0 +1,17 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ required "gateway.name is required" .Values.gateway.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- toYaml .Values.gateway.proxySpec | nindent 2 }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- toYaml .Values.gateway.spec | nindent 2 }}
+{{- end }}
