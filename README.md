@@ -15,6 +15,20 @@ Chart path: `charts/qovery-kserve-config`. Chart version: **0.2.0**.
 Knative Operator installs Serving and net-gateway-api when configured through
 a KnativeServing resource. No third-party generic chart is needed.
 
+## Packaged Helm repository
+
+Chart 0.2.0 is also available as a GitHub release with the official dependencies
+bundled. Existing Qovery Helm services can switch to this repository without
+changing from repository source to Git source:
+
+```bash
+helm repo add qovery-self-hosted-llm https://raw.githubusercontent.com/fabienfleureau/qovery-self-hosted-llm/main/helm/
+helm show chart qovery-self-hosted-llm/qovery-kserve-config --version 0.2.0
+```
+
+For Qovery, register that HTTPS repository, select chart `qovery-kserve-config`
+and version `0.2.0`. Dependency conditions and staged installation still apply.
+
 ## Download and render
 
 ```bash
