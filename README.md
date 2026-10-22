@@ -105,6 +105,46 @@ Use `https://github.com/fabienfleureau/qovery-self-hosted-llm`, branch `main`,
 root path `/charts/qovery-kserve-config`. Qovery must resolve the chart's
 pinned dependencies before rendering it.
 
-This repository contains no customer credentials or environment-specific
-configuration. Existing live Helm releases need an ownership migration;
+This repository contains no customer credentials. The `examples/` profiles
+use namespace placeholders rather than a deployed environment. Existing live Helm releases need an ownership migration;
 changing this repository does not migrate the running POC.
+
+
+## Qwen GPU example and Agent Tasks
+
+After the prerequisites above are ready, deploy this chart with
+`examples/qwen-knative-gpu.yaml` for the model release. It runs Qwen3 0.6B
+Q8_0 through the pinned llama.cpp CUDA image, with a 32,768-token context.
+The Claude Agent SDK sends its system prompt and tools with each request;
+the previous 8K context rejected a 13,174-token request before generation.
+This small model is for protocol validation, not a production agent benchmark.
+
+The example targets a Karpenter `gpu` node pool, NVIDIA GPUs and amd64 nodes.
+Adjust the node selector and tolerations to your cluster. The model is private
+and scales from zero to one replica. Fresh nodes download the CUDA image and
+model weights. The GPU node can be removed once it is empty.
+
+For the gateway release, replace `MODEL_NAMESPACE` in
+`examples/litellm-qwen.yaml` with the model release namespace. Create a Secret
+named `litellm-credentials` in the gateway release namespace containing
+`PROXY_MASTER_KEY`, then deploy this same chart with that profile. The profile
+turns on the official LiteLLM dependency. It does not create an InferenceService.
+Expose only LiteLLM port 4000 through your platform's HTTPS routing.
+
+Configure the Agent Workflow using the Claude protocol:
+
+```text
+ANTHROPIC_BASE_URL=https://<public-litellm-host>
+ANTHROPIC_AUTH_TOKEN=<LiteLLM master key; store as a secret>
+ANTHROPIC_API_KEY=<empty value, without literal quote characters>
+API_TIMEOUT_MS=900000
+ANTHROPIC_DEFAULT_HAIKU_MODEL=poc-qwen
+ANTHROPIC_DEFAULT_SONNET_MODEL=poc-qwen
+ANTHROPIC_DEFAULT_OPUS_MODEL=poc-qwen
+```
+
+Use provider type `CLAUDE`, no Bedrock credential, and model settings
+`{"model":"poc-qwen","effort":"low"}`. Bearer authentication avoids sending a
+real Anthropic API key. The model alias is a routing name, not a model identity
+assertion. Give the first request several minutes to create a GPU node and
+load the model. Keep gateway and Knative timeouts at least as long.

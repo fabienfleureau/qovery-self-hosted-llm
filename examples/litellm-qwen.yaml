@@ -1,0 +1,51 @@
+components:
+  litellm:
+    enabled: true
+litellm:
+  fullnameOverride: poc-litellm
+  image:
+    tag: main-v1.81.3-stable@sha256:3bee0b16d0066a81bbffd59a6b80524414dd4e6492b876b68807cba5f26fff97
+    pullPolicy: IfNotPresent
+    repository: ghcr.io/berriai/litellm
+  replicaCount: 1
+  numWorkers: 1
+  db:
+    deployStandalone: false
+    useExisting: false
+  redis:
+    enabled: false
+  migrationJob:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: '1'
+      memory: 1536Mi
+  serviceAccount:
+    create: true
+    automount: false
+  envVars:
+    LITELLM_TELEMETRY: 'False'
+    STORE_MODEL_IN_DB: 'False'
+  proxy_config:
+    model_list:
+    - model_name: poc-qwen
+      litellm_params:
+        model: openai/poc-qwen
+        api_base: http://poc-qwen-knative-predictor.MODEL_NAMESPACE.svc.cluster.local/v1
+        api_key: unused
+        max_tokens: 256
+        timeout: 900
+    litellm_settings:
+      drop_params: true
+      request_timeout: 900
+      telemetry: false
+    general_settings:
+      master_key: os.environ/PROXY_MASTER_KEY
+  masterkey: ''
+  nodeSelector:
+    kubernetes.io/arch: arm64
+  environmentSecrets:
+  - litellm-credentials

@@ -1,0 +1,104 @@
+models:
+  enabled: true
+  items:
+  - name: poc-qwen-knative
+    annotations:
+      serving.kserve.io/deploymentMode: Knative
+      autoscaling.knative.dev/window: 60s
+      autoscaling.knative.dev/scale-to-zero-pod-retention-period: 0s
+    labels:
+      networking.knative.dev/visibility: cluster-local
+    spec:
+      predictor:
+        minReplicas: 0
+        maxReplicas: 1
+        automountServiceAccountToken: false
+        containers:
+        - name: kserve-container
+          image: ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:d8ef18937b6dd74fdfd6b11fb753c0564e5d27723c94f48cf6d04e4a4d9b62e8
+          args:
+          - --model
+          - /models/Qwen3-0.6B-Q8_0.gguf
+          - --alias
+          - poc-qwen
+          - --host
+          - 0.0.0.0
+          - --port
+          - '8080'
+          - --ctx-size
+          - '32768'
+          - --threads
+          - '2'
+          - --parallel
+          - '1'
+          - --jinja
+          - --reasoning-budget
+          - '0'
+          - --n-gpu-layers
+          - '99'
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1536Mi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: '2'
+              memory: 3Gi
+              nvidia.com/gpu: 1
+          volumeMounts:
+          - name: model-cache
+            mountPath: /models
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 60
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 90
+        initContainers:
+        - name: download-model
+          image: curlimages/curl:8.12.1
+          command:
+          - sh
+          - -ec
+          args:
+          - if [ ! -s /models/Qwen3-0.6B-Q8_0.gguf ]; then curl --fail --location
+            --retry 5 --output /models/model.tmp https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/23749fefcc72300e3a2ad315e1317431b06b590a/Qwen3-0.6B-Q8_0.gguf;
+            mv /models/model.tmp /models/Qwen3-0.6B-Q8_0.gguf; fi
+          volumeMounts:
+          - name: model-cache
+            mountPath: /models
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+        volumes:
+        - name: model-cache
+          emptyDir:
+            sizeLimit: 2Gi
+        securityContext:
+          fsGroup: 1000
+        nodeSelector:
+          karpenter.sh/nodepool: gpu
+          kubernetes.io/arch: amd64
+          karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
+        tolerations:
+        - key: nodepool/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        timeout: 900
+        containerConcurrency: 1
