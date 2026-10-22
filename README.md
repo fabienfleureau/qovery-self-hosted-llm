@@ -204,3 +204,22 @@ cluster-scoped changes before installing shared controllers. net-gateway-api
 1.23 is beta. GPU node provisioning and image downloads can take minutes.
 The live test used Kubernetes 1.35.8, Gateway API 1.6.1, Envoy Gateway 1.9.1,
 KServe 0.16.0 and Knative/net-gateway-api 1.23.0.
+
+
+## Validation on 2026-10-22
+
+All seven Helm services in the live Qovery environment use this public parent
+chart. A complete environment redeploy passed the six Helm dependency stages
+and the final Agent Task stage. The real Claude Agent SDK ran successfully
+through LiteLLM, private Envoy, Knative and the GPU model. Eight API checks
+passed: authentication rejection, model discovery, OpenAI chat, Anthropic
+messages, text streaming, tool calls, streamed tool arguments and tool results.
+The SDK task took 4.464 seconds with a warm model. After the model scaled to
+zero pods, another task provisioned a new GPU node and succeeded in 252.843
+seconds without an SDK retry. The previous node was still terminating, so this
+is not a measured activation from zero GPU nodes. GPU memory usage on a Tesla
+T4 was 4,373 MiB with the 32K context.
+
+No Kimi or Deepgram inference, production task quality, fresh cluster install,
+load test or HA behavior is validated by this POC. No ai-runner Rust changes
+or Service Catalog entry are required for this setup.
