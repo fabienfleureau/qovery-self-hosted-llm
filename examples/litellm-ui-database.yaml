@@ -1,0 +1,22 @@
+litellm:
+  db:
+    deployStandalone: false
+    useExisting: false
+  envVars:
+    DATABASE_URL: qovery.env.LITELLM_DATABASE_URL
+    PROXY_BASE_URL: PUBLIC_GATEWAY_URL
+    UI_USERNAME: admin
+  migrationJob:
+    enabled: true
+    hooks:
+      argocd:
+        enabled: false
+      helm:
+        enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 2Gi

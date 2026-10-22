@@ -389,6 +389,55 @@ LiteLLM on CPU. The profiles use a 900-second LiteLLM/Knative request timeout
 and 1200-second public gateway timeout. No database, Redis or persistent usage
 accounting is configured. An invalid key can return HTTP 400 `no_db_connection`.
 
+## 4.8. Optional LiteLLM UI and PostgreSQL
+
+The default profile supports inference without a database. The dashboard
+requires PostgreSQL: `Authentication Error, Not connected to DB!` is a missing
+database, not a bad master key. Do not rotate the gateway key to fix it.
+
+Through the Qovery CLI, list eligible database versions and existing databases.
+For the POC, POST `environment/$ENV_ID/database` with this body, capturing its ID:
+
+```json
+{"name":"litellm-ui-postgres","type":"POSTGRESQL","version":"16","mode":"CONTAINER","accessibility":"PRIVATE","cpu":250,"memory":512,"storage":10}
+```
+
+POST `database/<id>/deploy` with `{}`, wait for its new execution to succeed,
+and check PostgreSQL readiness. Keep the database in the database stage before
+LiteLLM. This single-instance CPU database has persistent storage; it is not a
+production HA or backup plan.
+
+GET `variable?scope=HELM&parent_id=<LiteLLM-service-id>` and find the private
+PostgreSQL URL variable belonging to the new database. Do not print its value.
+Qovery rejects built-in variable names directly in Helm values. Create a
+service-scoped **alias** of that URL through POST `variable/<variable-id>/alias`:
+
+```json
+{"key":"LITELLM_DATABASE_URL","alias_scope":"HELM","alias_parent_id":"<LiteLLM-service-id>"}
+```
+
+Reuse the alias on subsequent runs. Do not store the URL as a plain variable,
+copy a credential into Git or use the public database URL. Merge
+`examples/litellm-ui-database.yaml` into the gateway profile, replacing
+`PUBLIC_GATEWAY_URL` with its discovered HTTPS origin. Leave both
+`db.deployStandalone` and `db.useExisting` false: DATABASE_URL is supplied
+through `litellm.envVars` to the Deployment and migration Job. Enable the Helm
+migration hook only after the database is ready. The hook must complete before
+the new gateway Deployment starts. Prisma migration exceeded a 512 MiB
+limit in the live test; the UI overlay gives it a 2 GiB limit. This is a
+transient migration allocation, not the PostgreSQL memory request.
+
+After the upgrade, test an actual login at `<gateway-url>/ui/`, using username
+`admin` and the unchanged master key, unless a separate UI password is set.
+Verify an authenticated database-backed management call and model discovery.
+A successful static `/ui` response alone does not prove login works. Rerun
+inference tests; invalid-key behavior can now be HTTP 401 instead of the
+DB-free `no_db_connection` error. Do not put session tokens in test reports.
+
+When rolling back UI configuration, preserve the database service and volume.
+Check schema compatibility before downgrading LiteLLM: reverting Helm values
+is not a database migration rollback.
+
 ## 5. Configure a real Agent Task
 
 Create a dedicated manual test workflow through
@@ -640,5 +689,5 @@ shared controllers or unrelated routes during cleanup.
 This runbook documents a tested existing-cluster POC and supplies a fresh-install
 procedure that still needs its own execution evidence. net-gateway-api 1.23 is
 beta; its limitations are separate from Qwen model quality, emptyDir downloads,
-single-replica availability and missing LiteLLM database/accounting. No Kimi,
+single-replica availability and, unless enabled, missing LiteLLM database/accounting. No Kimi,
 Deepgram, arbitrary model compatibility or production readiness is implied.

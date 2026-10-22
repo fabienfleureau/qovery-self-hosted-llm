@@ -5,9 +5,6 @@ KnativeServing, the private Envoy Gateway and KServe InferenceServices.
 
 Chart path: `charts/qovery-kserve-config`. Chart version: **0.2.0**.
 
-For an LLM or operator deploying through the Qovery CLI, follow
-[the environment preparation runbook](RUNBOOK.md).
-
 For an LLM preparing an environment through Qovery CLI, follow the
 [operator runbook](docs/llm-runbook.md). It covers discovery, staged deployment,
 Agent configuration, validation and recovery.
@@ -40,7 +37,7 @@ and version `0.2.0`. Dependency conditions and staged installation still apply.
 ```bash
 helm dependency build charts/qovery-kserve-config
 helm lint charts/qovery-kserve-config
-helm template poc charts/qovery-kserve-config --namespace <environment-namespace>
+helm template poc charts/qovery-kserve-config --namespace '<environment-namespace>'
 ```
 
 All dependencies and configuration resources are disabled by default.
@@ -240,3 +237,20 @@ T4 was 4,373 MiB with the 32K context.
 No Kimi or Deepgram inference, production task quality, fresh cluster install,
 load test or HA behavior is validated by this POC. No ai-runner Rust changes
 or Service Catalog entry are required for this setup.
+
+
+## Optional LiteLLM dashboard
+
+The default inference-only profile has no database, so the dashboard reports
+`Not connected to DB`. Add a private PostgreSQL service and merge
+`examples/litellm-ui-database.yaml` into the LiteLLM profile. The
+[runbook's UI section](docs/llm-runbook.md#48-optional-litellm-ui-and-postgresql)
+explains Qovery database aliases, migration ordering and login verification.
+The live POC uses a private PostgreSQL 16 container (250m CPU, 512 MiB RAM,
+10 GiB persistent storage). Keep the existing gateway key; it doubles as the
+`admin` login password unless a separate UI password is configured.
+
+
+The database-backed dashboard was validated with an actual admin login (HTTP
+303 and session cookie), an authenticated database-backed user-info call and
+model discovery. The master key and public gateway URL were preserved.
