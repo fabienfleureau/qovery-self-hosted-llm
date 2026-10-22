@@ -148,3 +148,23 @@ Use provider type `CLAUDE`, no Bedrock credential, and model settings
 real Anthropic API key. The model alias is a routing name, not a model identity
 assertion. Give the first request several minutes to create a GPU node and
 load the model. Keep gateway and Knative timeouts at least as long.
+
+
+### Qovery workflow URL override
+
+The live Qovery test revealed that workflow-scoped `ANTHROPIC_BASE_URL` and
+`ANTHROPIC_AUTH_TOKEN` were saved by the API but absent from the generated Job.
+For this POC, set the gateway key in the workflow's write-only `model.api_key`
+credential and add this non-secret workflow Docker fragment:
+
+```dockerfile
+ENV ANTHROPIC_BASE_URL=https://<public-litellm-host>
+ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+```
+
+Keep provider `CLAUDE` and model `poc-qwen`. This uses LiteLLM's API-key auth
+rather than bearer auth. Do not put the key in the Docker fragment. A real
+Agent SDK run through the chart completed successfully with this workaround;
+the eight HTTP smoke checks also passed. The 0.6B model added commentary
+instead of obeying an exact-output instruction, so this validates transport
+and SDK execution, not production agent quality.

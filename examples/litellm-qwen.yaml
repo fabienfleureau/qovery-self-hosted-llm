@@ -44,8 +44,7 @@ litellm:
       telemetry: false
     general_settings:
       master_key: os.environ/PROXY_MASTER_KEY
-  masterkey: ''
   nodeSelector:
     kubernetes.io/arch: arm64
-  environmentSecrets:
-  - litellm-credentials
+  masterkeySecretName: litellm-credentials
+  masterkeySecretKey: PROXY_MASTER_KEY
