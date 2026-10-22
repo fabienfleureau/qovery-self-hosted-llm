@@ -397,17 +397,59 @@ workflow first. Preserve its prompt, connectors and credential references
 unless changing them is part of the request. Do not attach personal connectors
 or clone the whole environment for this smoke test.
 
-The tested workflow request has these fields. Supply the key from the private
-file via Python/stdin, not a literal value committed to disk:
+Use the **Anthropic-compatible** LLM provider (`ANTHROPIC_COMPATIBLE` in the
+API). Its `base_url` is the gateway API root, and its write-only `credential`
+is the LiteLLM key. Configure these provider fields instead of workflow auth
+variables or a Docker URL override.
+
+First inspect available providers and reuse a matching one the caller may
+use. Do not overwrite an existing provider's URL, credential or scope merely
+because its name matches:
+
+```bash
+qovery api "organization/$ORG_ID/llmProvider" > "$RUN_DIR/providers.json"
+```
+
+If a new provider is needed, choose its name and scope. `USER` is personal to
+the caller; use `ORGANIZATION` only when a shared credential is intended and
+the caller has the required permission. The scope cannot be changed later.
+
+```bash
+export PROVIDER_NAME='self-hosted-llm'
+export PROVIDER_SCOPE='USER'
+# Run only if a suitable accessible provider does not already exist.
+python3 - <<'PY' | qovery api "organization/$ORG_ID/llmProvider" --method POST --input - > "$RUN_DIR/provider.json"
+import json, os, pathlib
+print(json.dumps({
+    'name': os.environ['PROVIDER_NAME'],
+    'type': 'ANTHROPIC_COMPATIBLE',
+    'scope': os.environ['PROVIDER_SCOPE'],
+    'base_url': os.environ['GATEWAY_URL'],
+    'credential': pathlib.Path(os.environ['KEY_FILE']).read_text().strip(),
+}))
+PY
+export LLM_PROVIDER_ID="$(jq -r '.id' "$RUN_DIR/provider.json")"
+qovery api "llmProvider/$LLM_PROVIDER_ID/models"
+```
+
+For an existing provider, set `LLM_PROVIDER_ID` to its discovered ID instead
+of running the create block. Its credential is never returned by the API;
+inspect `has_credential` and validate model discovery. A blank credential on
+edit preserves the stored value; a nonblank value rotates it. An
+`ANTHROPIC_COMPATIBLE` provider edit must resend `base_url`: omitting it or
+sending null is rejected. Use the API root without `/v1/messages`; an optional
+path prefix is allowed, such as OpenRouter's `https://openrouter.ai/api`.
+
+Create the test workflow with the following request shape. Import `json`,
+`os` and `urllib.parse` in the caller and read `gateway_url` from `GATEWAY_URL`:
 
 ```python
 body = {
     'name': 'llm-agent-smoke', 'enabled': True,
     'execution_mode': 'IN_PLACE', 'schedule': None,
     'description': 'Manual self-hosted Agent SDK validation',
-    'docker_fragment': 'ENV ANTHROPIC_BASE_URL=' + gateway_url + '\n'
-                       'ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1\n',
-    'model': {'type': 'CLAUDE', 'api_key': gateway_key,
+    'docker_fragment': '',
+    'model': {'type': 'CLAUDE', 'llm_provider_id': os.environ['LLM_PROVIDER_ID'],
               'settings': json.dumps({'model': 'poc-qwen', 'effort': 'low'})},
     'agent_prompt': 'Reply with exactly: POC_AGENT_OK. Do not use any tools.',
     'mcp_servers': [], 'context_service_ids': [], 'outputs': [],
@@ -417,10 +459,17 @@ body = {
 }
 ```
 
-Import `json` and `urllib.parse` in the caller. The `model.api_key` field is
-write-only. Do not attach a Bedrock LLM provider. Set workflow-scoped variables
-through `POST variable` with `variable_scope=AGENTIC_WORKFLOW` and
-`variable_parent_id=<workflow-id>`:
+The provider type is `ANTHROPIC_COMPATIBLE`; the workflow protocol type remains
+`CLAUDE`. Do not put `ANTHROPIC_COMPATIBLE` in `model.type`, attach a Bedrock
+provider, or send `model.api_key` together with `llm_provider_id`. Qovery uses
+the provider URL and sends its credential as a bearer token, not an API key.
+No manual auth variables or Docker URL override are required. For an existing
+workflow, remove obsolete `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and
+`ANTHROPIC_API_KEY` variables and only the corresponding old Docker ENV lines;
+preserve unrelated variables, Docker instructions, prompts and connectors.
+
+Set workflow-scoped tuning variables through `POST variable` with
+`variable_scope=AGENTIC_WORKFLOW` and `variable_parent_id=<workflow-id>`:
 
 | Key | Value |
 | --- | --- |
@@ -430,17 +479,17 @@ through `POST variable` with `variable_scope=AGENTIC_WORKFLOW` and
 | `ANTHROPIC_DEFAULT_SONNET_MODEL` | `poc-qwen` |
 | `ANTHROPIC_DEFAULT_OPUS_MODEL` | `poc-qwen` |
 
-The Docker URL override is deliberate: workflow URL/auth-token variables were
-saved by the API but omitted from the generated Job in the live test. The
-provider API credential plus Docker `ENV ANTHROPIC_BASE_URL` is the validated
-workaround. Never put the key in that fragment. If testing the alternative
-bearer setup, verify the final Job has the URL, auth token and a truly empty
-API key; the two literal characters `""` are not an empty value.
+The earlier POC needed a Docker URL override; that workaround predates the
+provider feature and is not the recommended path. These provider fields were
+checked against the current API specification. Run the runtime validation
+below before claiming the new configuration works in the target environment.
 
 Run with `POST agenticWorkflow/{workflowId}/deploy`, body `{}`. Inspect
 `agenticWorkflow/{workflowId}/deploymentHistoryV2`, the actual Job env and logs.
-Check the URL with `printenv ANTHROPIC_BASE_URL` while the task is running;
-report credential presence only, never the value or the complete environment.
+Verify the generated URL matches the provider base URL, the auth token is
+present, and `ANTHROPIC_API_KEY` is explicitly empty. Check the effective
+process environment while the task is running; report credential presence
+only, never the value or the complete environment.
 Record an SDK `result` with `is_error=false`/successful logs and exit code 0.
 Model self-identification is not authoritative evidence of its model version.
 The tiny Qwen model may ignore exact-output instructions even on a successful
@@ -541,7 +590,7 @@ URL, current endpoint/model alias, IDs, profiles, versions, evidence and limits.
 | Helm DEPLOYED but workload unavailable | Inspect pods, events, webhook endpoints and resource conditions; wait for actual readiness. |
 | GPU pod Pending | Inspect node selectors, taints/tolerations, pool instance requirements, quotas, NodeClaims and NVIDIA plugin. |
 | Agent pod Pending | Compare request plus daemon/sidecar overhead with permitted CPU instance sizes. |
-| Invalid API key from Claude | Verify URL inside the image/process and provider credential; requests may be going to Anthropic when the override was omitted. |
+| Invalid API key from Claude | Verify the workflow references the intended ANTHROPIC_COMPATIBLE provider, its base URL/credential and the generated Job auth variables. Remove obsolete inline credentials and endpoint overrides. |
 | OpenRouter 403 key limit | Fix provider budget; retries or chart changes do not fix it. |
 | Context overflow | Check actual llama.cpp context and prompt token count; keep the initial model at 32K. |
 | Timeout from zero | Trace LiteLLM → private Gateway → Activator → revision; inspect cold-start events and all timeout layers. |

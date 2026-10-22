@@ -5,6 +5,9 @@ KnativeServing, the private Envoy Gateway and KServe InferenceServices.
 
 Chart path: `charts/qovery-kserve-config`. Chart version: **0.2.0**.
 
+For an LLM or operator deploying through the Qovery CLI, follow
+[the environment preparation runbook](RUNBOOK.md).
+
 For an LLM preparing an environment through Qovery CLI, follow the
 [operator runbook](docs/llm-runbook.md). It covers discovery, staged deployment,
 Agent configuration, validation and recovery.
@@ -138,43 +141,53 @@ named `litellm-credentials` in the gateway release namespace containing
 turns on the official LiteLLM dependency. It does not create an InferenceService.
 Expose only LiteLLM port 4000 through your platform's HTTPS routing.
 
-Configure the Agent Workflow using the Claude protocol:
+Configure the Agent Workflow using an **Anthropic-compatible LLM provider**:
 
-```text
-ANTHROPIC_BASE_URL=https://<public-litellm-host>
-ANTHROPIC_AUTH_TOKEN=<LiteLLM master key; store as a secret>
-ANTHROPIC_API_KEY=<empty value, without literal quote characters>
-API_TIMEOUT_MS=900000
-ANTHROPIC_DEFAULT_HAIKU_MODEL=poc-qwen
-ANTHROPIC_DEFAULT_SONNET_MODEL=poc-qwen
-ANTHROPIC_DEFAULT_OPUS_MODEL=poc-qwen
+1. Create a Qovery LLM provider of type **Anthropic-compatible**
+   (`ANTHROPIC_COMPATIBLE` in the API).
+2. Set its **base URL** to `https://<public-litellm-host>` and its credential
+   to the LiteLLM master key. Use the API root, without `/v1/messages`.
+3. Select that provider in the Agent Workflow and choose model `poc-qwen`.
+
+For CLI configuration, create the provider through
+`POST organization/{organizationId}/llmProvider` with `type`, `base_url` and
+`credential`, then reference its ID in the workflow:
+
+```json
+{
+  "model": {
+    "type": "CLAUDE",
+    "llm_provider_id": "<anthropic-compatible-provider-id>",
+    "settings": "{\"model\":\"poc-qwen\",\"effort\":\"low\"}"
+  }
+}
 ```
 
-Use provider type `CLAUDE`, no Bedrock credential, and model settings
-`{"model":"poc-qwen","effort":"low"}`. Bearer authentication avoids sending a
-real Anthropic API key. The model alias is a routing name, not a model identity
-assertion. Give the first request several minutes to create a GPU node and
-load the model. Keep gateway and Knative timeouts at least as long.
+`CLAUDE` is the workflow's protocol type; `ANTHROPIC_COMPATIBLE` is the LLM
+provider type. Do not supply an inline `model.api_key` alongside the provider
+ID. Qovery uses the provider's base URL and sends its credential as a bearer
+token. No manual `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`,
+`ANTHROPIC_API_KEY` or Docker URL override is needed. When migrating an existing
+workflow, remove obsolete endpoint/auth overrides so the selected provider
+controls the connection; preserve unrelated workflow configuration.
 
+Keep `API_TIMEOUT_MS=900000` for GPU cold starts and map the default
+Haiku/Sonnet/Opus aliases to `poc-qwen` if the SDK uses those aliases.
+The model alias is a routing name, not a model identity assertion. Give the
+first request several minutes to create a GPU node and load the model. Keep
+gateway and Knative timeouts at least as long.
 
-### Qovery workflow URL override
+For OpenRouter, the same provider type accepts base URL
+`https://openrouter.ai/api`, the OpenRouter key as its credential, and an
+OpenRouter model ID in the workflow settings. Model compatibility still needs
+its own Agent Task validation.
 
-The live Qovery test revealed that workflow-scoped `ANTHROPIC_BASE_URL` and
-`ANTHROPIC_AUTH_TOKEN` were saved by the API but absent from the generated Job.
-For this POC, set the gateway key in the workflow's write-only `model.api_key`
-credential and add this non-secret workflow Docker fragment:
-
-```dockerfile
-ENV ANTHROPIC_BASE_URL=https://<public-litellm-host>
-ENV CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-```
-
-Keep provider `CLAUDE` and model `poc-qwen`. This uses LiteLLM's API-key auth
-rather than bearer auth. Do not put the key in the Docker fragment. A real
-Agent SDK run through the chart completed successfully with this workaround;
-the eight HTTP smoke checks also passed. The 0.6B model added commentary
-instead of obeying an exact-output instruction, so this validates transport
-and SDK execution, not production agent quality.
+The earlier POC tests used a Docker URL override before this provider was
+available. That workaround is historical, not the setup procedure above.
+The provider API fields have been checked against the current Qovery
+specification; the earlier timings do not constitute a live test of this new
+configuration. See the [runbook](docs/llm-runbook.md#5-configure-a-real-agent-task)
+for CLI steps and runtime validation.
 
 
 ## Complete staged example
