@@ -18,8 +18,7 @@ a KnativeServing resource. No third-party generic chart is needed.
 ## Packaged Helm repository
 
 Chart 0.2.0 is also available as a GitHub release with the official dependencies
-bundled. Existing Qovery Helm services can switch to this repository without
-changing from repository source to Git source:
+bundled. New Qovery Helm services can use this repository instead of Git:
 
 ```bash
 helm repo add qovery-self-hosted-llm https://raw.githubusercontent.com/fabienfleureau/qovery-self-hosted-llm/main/helm/
@@ -107,7 +106,11 @@ pinned dependencies before rendering it.
 
 This repository contains no customer credentials. The `examples/` profiles
 use namespace placeholders rather than a deployed environment. Existing live Helm releases need an ownership migration;
-changing this repository does not migrate the running POC.
+existing releases require explicit resource retention and ownership transfer.
+Qovery rejected changing the source of the original Helm services; the live
+POC now uses seven replacement/configuration services all pointing at this
+chart. KServe resources retained their UIDs. The stateless LiteLLM Deployment
+was recreated because its selector includes the Helm release name.
 
 
 ## Qwen GPU example and Agent Tasks
