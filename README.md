@@ -5,6 +5,10 @@ KnativeServing, the private Envoy Gateway and KServe InferenceServices.
 
 Chart path: `charts/qovery-kserve-config`. Chart version: **0.2.0**.
 
+For an LLM preparing an environment through Qovery CLI, follow the
+[operator runbook](docs/llm-runbook.md). It covers discovery, staged deployment,
+Agent configuration, validation and recovery.
+
 | Component | Official Helm source | Pinned chart version | Enable flag |
 | --- | --- | --- | --- |
 | KServe CRDs | `oci://ghcr.io/kserve/charts/kserve-crd` | v0.16.0 | `components.kserveCRDs.enabled` |
