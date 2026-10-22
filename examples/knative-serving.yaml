@@ -1,0 +1,66 @@
+serving:
+  enabled: true
+  namespace: knative-serving
+  name: knative-serving
+  spec:
+    version: 1.23.0
+    ingress:
+      istio:
+        enabled: false
+      kourier:
+        enabled: false
+      contour:
+        enabled: false
+      gateway-api:
+        enabled: true
+    config:
+      autoscaler:
+        enable-scale-to-zero: 'true'
+        scale-to-zero-grace-period: 30s
+        scale-to-zero-pod-retention-period: 0s
+        stable-window: 60s
+        activator-capacity: '100'
+      defaults:
+        revision-timeout-seconds: '900'
+        max-revision-timeout-seconds: '1200'
+        revision-response-start-timeout-seconds: '900'
+      deployment:
+        queue-sidecar-image: gcr.io/knative-releases/knative.dev/serving/cmd/queue@sha256:a3cc71ce80dbc6df8781f15eac2cf3531a4c9815271799afd8776bef9e6aeaf2
+        progress-deadline: 1200s
+      domain:
+        svc.cluster.local: ''
+      features:
+        kubernetes.podspec-nodeselector: enabled
+        kubernetes.podspec-affinity: enabled
+        kubernetes.podspec-tolerations: enabled
+        kubernetes.podspec-volumes-emptydir: enabled
+        kubernetes.podspec-init-containers: enabled
+        kubernetes.podspec-securitycontext: enabled
+        secure-pod-defaults: disabled
+      network:
+        ingress-class: gateway-api.ingress.networking.knative.dev
+        domain-template: '{{.Name}}.{{.Namespace}}.{{.Domain}}'
+      gateway:
+        external-gateways: "- class: qovery-private-gateway\n  gateway: MODEL_NAMESPACE/poc-knative-internal\n\
+          \  supported-features:\n  - HTTPRouteRequestTimeout\n  service: qovery/ENVOY_SERVICE\n"
+        local-gateways: "- class: qovery-private-gateway\n  gateway: MODEL_NAMESPACE/poc-knative-internal\n\
+          \  supported-features:\n  - HTTPRouteRequestTimeout\n  service: qovery/ENVOY_SERVICE\n"
+    workloads:
+    - name: activator
+      nodeSelector:
+        kubernetes.io/arch: arm64
+    - name: autoscaler
+      nodeSelector:
+        kubernetes.io/arch: arm64
+    - name: controller
+      nodeSelector:
+        kubernetes.io/arch: arm64
+    - name: webhook
+      nodeSelector:
+        kubernetes.io/arch: arm64
+    - name: net-gateway-api-controller
+      nodeSelector:
+        kubernetes.io/arch: arm64
+    - name: net-gateway-api-webhook
+      nodeSelector:
+        kubernetes.io/arch: arm64

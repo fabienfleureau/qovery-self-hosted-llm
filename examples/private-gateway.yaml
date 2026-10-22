@@ -1,0 +1,35 @@
+gateway:
+  enabled: true
+  name: poc-knative-internal
+  proxySpec:
+    provider:
+      type: Kubernetes
+      kubernetes:
+        envoyService:
+          type: ClusterIP
+        envoyDeployment:
+          replicas: 1
+          pod:
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                    - key: kubernetes.io/arch
+                      operator: In
+                      values:
+                      - arm64
+  spec:
+    gatewayClassName: qovery-private-gateway
+    infrastructure:
+      parametersRef:
+        group: gateway.envoyproxy.io
+        kind: EnvoyProxy
+        name: poc-knative-internal
+    listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same

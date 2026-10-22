@@ -1,0 +1,3 @@
+components:
+  kserveCRDs:
+    enabled: true

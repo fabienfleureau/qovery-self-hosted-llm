@@ -1,0 +1,24 @@
+components:
+  kserveController:
+    enabled: true
+kserveController:
+  kserve:
+    controller:
+      deploymentMode: Knative
+      gateway:
+        disableIngressCreation: true
+        disableIstioVirtualHost: true
+        localGateway:
+          gateway: MODEL_NAMESPACE/poc-knative-internal
+          gatewayService: ENVOY_SERVICE.qovery.svc.cluster.local
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      podAnnotations:
+        poc.qovery.com/knative-serving-version: 1.23.0

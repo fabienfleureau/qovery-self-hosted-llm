@@ -171,3 +171,36 @@ Agent SDK run through the chart completed successfully with this workaround;
 the eight HTTP smoke checks also passed. The 0.6B model added commentary
 instead of obeying an exact-output instruction, so this validates transport
 and SDK execution, not production agent quality.
+
+
+## Complete staged example
+
+All seven services in the live POC use this repository's chart, each with one
+profile. `examples/` also contains the control-plane profiles used for it:
+
+| Order | Profile | Readiness gate |
+| --- | --- | --- |
+| 1 | `kserve-crds.yaml`, `knative-operator.yaml` | CRDs established; Operator webhook ready |
+| 2 | `private-gateway.yaml` | Gateway programmed; private Envoy service exists |
+| 3 | `knative-serving.yaml` | KnativeServing Ready |
+| 4 | `kserve-controller.yaml` | KServe webhook ready |
+| 5 | `qwen-knative-gpu.yaml` | InferenceService Ready |
+| 6 | `litellm-qwen.yaml` | LiteLLM healthy; then run Agent validation |
+
+These profiles target Qovery's `qovery-private-gateway` class, ARM64 CPU nodes
+and the `gpu` NVIDIA node pool. Reuse existing Envoy Gateway and cert-manager.
+Create the `knative-serving` namespace before stage 3. Replace `MODEL_NAMESPACE`
+with the model/Gateway release namespace. After stage 2, find the generated
+private data-plane service and replace `ENVOY_SERVICE` in stages 3 and 4:
+
+```bash
+kubectl -n qovery get service \
+  -l "gateway.envoyproxy.io/owning-gateway-name=poc-knative-internal,gateway.envoyproxy.io/owning-gateway-namespace=$MODEL_NAMESPACE"
+```
+
+The examples are rendered profiles from an existing cluster; a fresh cluster
+bootstrap has not been tested. Check cluster version compatibility and review
+cluster-scoped changes before installing shared controllers. net-gateway-api
+1.23 is beta. GPU node provisioning and image downloads can take minutes.
+The live test used Kubernetes 1.35.8, Gateway API 1.6.1, Envoy Gateway 1.9.1,
+KServe 0.16.0 and Knative/net-gateway-api 1.23.0.
